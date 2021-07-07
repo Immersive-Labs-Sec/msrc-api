@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 # PatchReview
 # Copyright (C) 2021 Kevin Breen, Immersive Labs
 # https://github.com/Immersive-Labs-Sec/msrc-api
@@ -21,8 +23,8 @@
 # SOFTWARE.
 
 import argparse
-
 import requests
+from datetime import datetime
 
 base_url = 'https://api.msrc.microsoft.com/cvrf/v2.0/'
 
@@ -63,12 +65,21 @@ def count_exploited(all_vulns):
     return {'counter': counter, 'cves': cves}
 
 
+
+def valid_date(s):
+    try:
+        if datetime.strptime(s, "%Y-%b"):
+            return s
+    except ValueError:
+        msg = "Not a valid date: must be YYYY-Mmm"
+        raise argparse.ArgumentTypeError(msg)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Read vulnerability stats for a patch tuesday release.')
-    parser.add_argument('security_update', help="Date string for the report query in format YYYY-mmm")
+    parser.add_argument('security_update', help="Date string for the report query in format YYYY-mmm", type=valid_date)
 
     args = parser.parse_args()
-
 
     # Get the list of all vulns
     get_sec_release = requests.get(f'{base_url}cvrf/{args.security_update}', headers=headers)
