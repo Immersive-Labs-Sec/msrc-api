@@ -88,7 +88,7 @@ if __name__ == "__main__":
     for vuln_type in vuln_types:
 
         count = count_type(vuln_type, all_vulns)
-        print(f'  [-] ]{count} {vuln_type} Vulnerabilities')
+        print(f'  [-] {count} {vuln_type} Vulnerabilities')
 
     exploited = count_exploited(all_vulns)
     print(f'[+] Found {exploited["counter"]} exploited in the wild')
