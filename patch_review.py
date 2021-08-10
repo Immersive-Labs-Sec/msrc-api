@@ -21,8 +21,8 @@
 # SOFTWARE.
 
 import argparse
-
 import requests
+import re
 
 base_url = 'https://api.msrc.microsoft.com/cvrf/v2.0/'
 
@@ -35,6 +35,7 @@ vuln_types = [
     'Information Disclosure',
     'Denial of Service',
     'Spoofing',
+    'Edge - Chromium'
     ]
 
 
@@ -43,7 +44,11 @@ def count_type(search_type, all_vulns):
     for vuln in all_vulns:
         for threat in vuln['Threats']:
             if threat['Type'] == 0:
-                if threat['Description'].get('Value') == search_type:
+                if search_type == "Edge - Chromium":
+                    if threat['ProductID'][0] == '11655':
+                        counter += 1
+                        break
+                elif threat['Description'].get('Value') == search_type:
                     counter += 1
                     break
     return counter
@@ -62,6 +67,15 @@ def count_exploited(all_vulns):
                     break
     return {'counter': counter, 'cves': cves}
 
+"""
+check the date format is yyyy-mmm
+"""
+def check_data_format(date_string):
+    date_pattern = '\\d{4}-(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)'
+    if re.match(date_pattern, date_string, re.IGNORECASE):
+        return True
+    
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Read vulnerability stats for a patch tuesday release.')
@@ -69,6 +83,9 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    if not check_data_format(args.security_update):
+        print("[!] Invalid date format please use 'yyyy-mmm'")
+        exit()
 
     # Get the list of all vulns
     get_sec_release = requests.get(f'{base_url}cvrf/{args.security_update}', headers=headers)
@@ -88,7 +105,7 @@ if __name__ == "__main__":
     for vuln_type in vuln_types:
 
         count = count_type(vuln_type, all_vulns)
-        print(f'  [-] ]{count} {vuln_type} Vulnerabilities')
+        print(f'  [-] {count} {vuln_type} Vulnerabilities')
 
     exploited = count_exploited(all_vulns)
     print(f'[+] Found {exploited["counter"]} exploited in the wild')
