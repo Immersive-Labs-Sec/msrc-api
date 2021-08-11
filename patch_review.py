@@ -49,6 +49,9 @@ def count_type(search_type, all_vulns):
                         counter += 1
                         break
                 elif threat['Description'].get('Value') == search_type:
+                    if threat['ProductID'][0] == '11655':
+                        # Do not double count Chromium Vulns
+                        break
                     counter += 1
                     break
     return counter
@@ -74,7 +77,11 @@ def check_data_format(date_string):
     date_pattern = '\\d{4}-(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)'
     if re.match(date_pattern, date_string, re.IGNORECASE):
         return True
-    
+
+def print_header(title):
+    print("[+] Microsoft Patch Tuesday Stats")
+    print("[+] https://github.com/Immersive-Labs-Sec/msrc-api")
+    print(f"[+] {title}")
 
 
 if __name__ == "__main__":
@@ -98,7 +105,7 @@ if __name__ == "__main__":
 
     len_vuln = len(all_vulns)
 
-    print(title)
+    print_header(title)
 
     print(f'[+] Found a total of {len_vuln} vulnerabilities')
 
