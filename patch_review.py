@@ -56,15 +56,32 @@ def count_type(search_type, all_vulns):
                     break
     return counter
 
-
 def count_exploited(all_vulns):
+    counter = 0
+    cves = []
+    for vuln in all_vulns:
+        cvss_score = 0.0
+        cvss_sets = vuln.get('CVSSScoreSets', [])
+        if len(cvss_sets) > 0 :
+            cvss_score = cvss_sets[0].get('TemporalScore', 0.0)
+
+        for threat in vuln['Threats']:
+            if threat['Type'] == 1:
+                description = threat['Description']['Value']
+                if 'Exploited:Yes' in description:
+                    counter += 1
+                    cves.append(f'{vuln["CVE"]} - {cvss_score} - {vuln["Title"]["Value"]}')
+                    break
+    return {'counter': counter, 'cves': cves}
+
+def exploitation_likely(all_vulns):
     counter = 0
     cves = []
     for vuln in all_vulns:
         for threat in vuln['Threats']:
             if threat['Type'] == 1:
                 description = threat['Description']['Value']
-                if 'Exploited:Yes' in description:
+                if 'Exploitation More Likely'.lower() in description.lower():
                     counter += 1
                     cves.append(f'{vuln["CVE"]} -- {vuln["Title"]["Value"]}')
                     break
@@ -97,6 +114,10 @@ if __name__ == "__main__":
     # Get the list of all vulns
     get_sec_release = requests.get(f'{base_url}cvrf/{args.security_update}', headers=headers)
 
+    if get_sec_release.status_code != 200:
+        print(f"[!] Thats a {get_sec_release.status_code} from MS no release notes yet")
+        exit()
+
     release_json = get_sec_release.json()
 
     title = release_json.get('DocumentTitle', 'Release not found').get('Value')
@@ -118,3 +139,19 @@ if __name__ == "__main__":
     print(f'[+] Found {exploited["counter"]} exploited in the wild')
     for cve in exploited['cves']:
         print(f'  [-] {cve}')
+
+    base_score = 8.0
+    print('[+] Highest Rated Vulnerabilities')
+    for vuln in all_vulns:
+        title = vuln.get('Title', {'Value': 'Not Found'}).get('Value')
+        cve_id = vuln.get('CVE', '')
+        cvss_sets = vuln.get('CVSSScoreSets', [])
+        if len(cvss_sets) > 0 :
+            cvss_score = cvss_sets[0].get('TemporalScore', 0)
+            if cvss_score >= base_score:
+                print(f'  [-] {cve_id} - {cvss_score} - {title}')
+
+    exploitation = exploitation_likely(all_vulns)
+    print(f'[+] Found {exploitation["counter"]} vulnerabilites more likely to be exploited')
+    for cve in exploitation['cves']:
+        print(f'  [-] {cve} - https://www.cve.org/CVERecord?id={cve.split()[0]}')
