@@ -63,7 +63,7 @@ def count_exploited(all_vulns):
         cvss_score = 0.0
         cvss_sets = vuln.get('CVSSScoreSets', [])
         if len(cvss_sets) > 0 :
-            cvss_score = cvss_sets[0].get('TemporalScore', 0.0)
+            cvss_score = cvss_sets[0].get('BaseScore', 0.0)
 
         for threat in vuln['Threats']:
             if threat['Type'] == 1:
@@ -147,7 +147,7 @@ if __name__ == "__main__":
         cve_id = vuln.get('CVE', '')
         cvss_sets = vuln.get('CVSSScoreSets', [])
         if len(cvss_sets) > 0 :
-            cvss_score = cvss_sets[0].get('TemporalScore', 0)
+            cvss_score = cvss_sets[0].get('BaseScore', 0)
             if cvss_score >= base_score:
                 print(f'  [-] {cve_id} - {cvss_score} - {title}')
 
