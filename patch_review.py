@@ -1,5 +1,5 @@
 # PatchReview
-# Copyright (C) 2021 Kevin Breen, Immersive Labs
+# Copyright (C) 2023 Kevin Breen, Immersive Labs
 # https://github.com/Immersive-Labs-Sec/msrc-api
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -20,15 +20,44 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+"""
+This script fetches and analyzes data from Microsoft's Security Response Center (MSRC) API. 
+
+It takes a date string for a security update (in the format 'YYYY-mmm') as a command-line argument. The script then sends a GET request to the MSRC API to fetch a list of all vulnerabilities from the security update.
+
+The fetched data is parsed and the script outputs statistics about the vulnerabilities, including:
+
+- The total number of vulnerabilities
+- The number of each type of vulnerability, where types include 'Elevation of Privilege', 'Security Feature Bypass', 'Remote Code Execution', 'Information Disclosure', 'Denial of Service', 'Spoofing', and 'Edge - Chromium'
+- The number of vulnerabilities that have been exploited, along with their details
+- The number of vulnerabilities that are more likely to be exploited, along with their details
+
+The script includes error handling for the GET request and checks the format of the input date string.
+
+Usage:
+    python patch_review.py <security_update>
+
+    where <security_update> is a date string in the format 'YYYY-mmm'.
+
+Example:
+    python patch_review.py 2023-Jan
+
+Requires:
+    requests: To send the GET request to the MSRC API.
+
+Note:
+    This script is intended to be run as a standalone Python program, and not in a Jupyter notebook, as it makes use of argparse for command line arguments.
+"""
 import argparse
+import datetime
 import requests
 import re
 
-base_url = 'https://api.msrc.microsoft.com/cvrf/v2.0/'
+# Constants
+BASE_URL = 'https://api.msrc.microsoft.com/cvrf/v2.0/'
+HEADERS = {'Accept': 'application/json'}
 
-headers = {'Accept': 'application/json'}
-
-vuln_types = [
+VULN_TYPES = [
     'Elevation of Privilege',
     'Security Feature Bypass',
     'Remote Code Execution',
@@ -36,8 +65,7 @@ vuln_types = [
     'Denial of Service',
     'Spoofing',
     'Edge - Chromium'
-    ]
-
+]
 
 def count_type(search_type, all_vulns):
     counter = 0
@@ -50,7 +78,6 @@ def count_type(search_type, all_vulns):
                         break
                 elif threat['Description'].get('Value') == search_type:
                     if threat['ProductID'][0] == '11655':
-                        # Do not double count Chromium Vulns
                         break
                     counter += 1
                     break
@@ -62,7 +89,7 @@ def count_exploited(all_vulns):
     for vuln in all_vulns:
         cvss_score = 0.0
         cvss_sets = vuln.get('CVSSScoreSets', [])
-        if len(cvss_sets) > 0 :
+        if cvss_sets:
             cvss_score = cvss_sets[0].get('BaseScore', 0.0)
 
         for threat in vuln['Threats']:
@@ -87,51 +114,42 @@ def exploitation_likely(all_vulns):
                     break
     return {'counter': counter, 'cves': cves}
 
-"""
-check the date format is yyyy-mmm
-"""
 def check_data_format(date_string):
-    date_pattern = '\\d{4}-(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)'
-    if re.match(date_pattern, date_string, re.IGNORECASE):
-        return True
+    date_pattern = r'\d{4}-(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)'
+    return bool(re.match(date_pattern, date_string, re.IGNORECASE))
 
 def print_header(title):
     print("[+] Microsoft Patch Tuesday Stats")
     print("[+] https://github.com/Immersive-Labs-Sec/msrc-api")
     print(f"[+] {title}")
 
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Read vulnerability stats for a patch tuesday release.')
-    parser.add_argument('security_update', help="Date string for the report query in format YYYY-mmm")
-
-    args = parser.parse_args()
-
-    if not check_data_format(args.security_update):
-        print("[!] Invalid date format please use 'yyyy-mmm'")
-        exit()
-
-    # Get the list of all vulns
-    get_sec_release = requests.get(f'{base_url}cvrf/{args.security_update}', headers=headers)
-
-    if get_sec_release.status_code != 200:
-        print(f"[!] Thats a {get_sec_release.status_code} from MS no release notes yet")
-        exit()
+def fetch_vulnerabilities(security_update):
+    try:
+        get_sec_release = requests.get(f'{BASE_URL}cvrf/{security_update}', headers=HEADERS)
+        get_sec_release.raise_for_status()
+    except requests.exceptions.HTTPError as err:
+        print(f"HTTP error occurred: {err}")
+        return None
+    except Exception as err:
+        print(f"An error occurred: {err}")
+        return None
 
     release_json = get_sec_release.json()
+    return release_json
 
+def parse_vulnerabilities(release_json):
     title = release_json.get('DocumentTitle', 'Release not found').get('Value')
-
     all_vulns = release_json.get('Vulnerability', [])
 
+    return title, all_vulns
+
+def print_vulnerability_stats(title, all_vulns):
     len_vuln = len(all_vulns)
 
     print_header(title)
-
     print(f'[+] Found a total of {len_vuln} vulnerabilities')
 
-    for vuln_type in vuln_types:
-
+    for vuln_type in VULN_TYPES:
         count = count_type(vuln_type, all_vulns)
         print(f'  [-] {count} {vuln_type} Vulnerabilities')
 
@@ -146,12 +164,38 @@ if __name__ == "__main__":
         title = vuln.get('Title', {'Value': 'Not Found'}).get('Value')
         cve_id = vuln.get('CVE', '')
         cvss_sets = vuln.get('CVSSScoreSets', [])
-        if len(cvss_sets) > 0 :
+        if cvss_sets:
             cvss_score = cvss_sets[0].get('BaseScore', 0)
             if cvss_score >= base_score:
                 print(f'  [-] {cve_id} - {cvss_score} - {title}')
 
     exploitation = exploitation_likely(all_vulns)
-    print(f'[+] Found {exploitation["counter"]} vulnerabilites more likely to be exploited')
+    print(f'[+] Found {exploitation["counter"]} vulnerabilities more likely to be exploited')
     for cve in exploitation['cves']:
         print(f'  [-] {cve} - https://www.cve.org/CVERecord?id={cve.split()[0]}')
+
+def main():
+    parser = argparse.ArgumentParser(description='Read vulnerability stats for a patch Tuesday release.')
+    parser.add_argument('security_update', nargs='?', help="Date string for the report query in format 'YYYY-mmm'")
+    args = parser.parse_args()
+
+    if args.security_update is None:
+        now = datetime.datetime.now()
+        args.security_update = now.strftime("%Y-%b")
+
+    if not check_data_format(args.security_update):
+        print("[!] Invalid date format please use 'yyyy-mmm'")
+        return
+
+    release_json = fetch_vulnerabilities(args.security_update)
+    if release_json is None:
+        print("[!] No vulnerability data fetched.")
+        return
+
+    title, all_vulns = parse_vulnerabilities(release_json)
+
+    print_vulnerability_stats(title, all_vulns)
+
+if __name__ == "__main__":
+    main()
+
