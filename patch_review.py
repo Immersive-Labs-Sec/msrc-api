@@ -49,6 +49,7 @@ Note:
     This script is intended to be run as a standalone Python program, and not in a Jupyter notebook, as it makes use of argparse for command line arguments.
 """
 import argparse
+import datetime
 import requests
 import re
 
@@ -175,8 +176,12 @@ def print_vulnerability_stats(title, all_vulns):
 
 def main():
     parser = argparse.ArgumentParser(description='Read vulnerability stats for a patch Tuesday release.')
-    parser.add_argument('security_update', help="Date string for the report query in format 'YYYY-mmm'")
+    parser.add_argument('security_update', nargs='?', help="Date string for the report query in format 'YYYY-mmm'")
     args = parser.parse_args()
+
+    if args.security_update is None:
+        now = datetime.datetime.now()
+        args.security_update = now.strftime("%Y-%b")
 
     if not check_data_format(args.security_update):
         print("[!] Invalid date format please use 'yyyy-mmm'")
