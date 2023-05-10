@@ -20,6 +20,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+from datetime import datetime
 import argparse
 import requests
 import re
@@ -102,14 +103,12 @@ def print_header(title):
 
 
 if __name__ == "__main__":
+    today = datetime.now().strftime('%Y-%b')
     parser = argparse.ArgumentParser(description='Read vulnerability stats for a patch tuesday release.')
-    parser.add_argument('security_update', help="Date string for the report query in format YYYY-mmm")
+    parser.add_argument('security_update', nargs='?', default=today,
+                        help="Date string for the report query in format YYYY-mmm")
 
     args = parser.parse_args()
-
-    if not check_data_format(args.security_update):
-        print("[!] Invalid date format please use 'yyyy-mmm'")
-        exit()
 
     # Get the list of all vulns
     get_sec_release = requests.get(f'{base_url}cvrf/{args.security_update}', headers=headers)
